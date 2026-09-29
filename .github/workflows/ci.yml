@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: pytest -q
+      - name: Train on synthetic data (validates data, writes model card)
+        run: PYTHONPATH=src python -m mlpipe.train --out artifacts
+      - name: Build the serving image with the trained model
+        run: docker build -f docker/Dockerfile -t credit-default:ci .
+      - name: Container smoke test
+        run: |
+          docker run -d --rm -p 8080:8080 --name model credit-default:ci
+          pip install httpx
+          python scripts/smoke_test.py --url http://localhost:8080 --retries 10
+          docker stop model
+
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate

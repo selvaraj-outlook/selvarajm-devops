@@ -1,0 +1,108 @@
+name: ml-pipeline
+
+# Train -> gate (champion/challenger) -> image -> staging -> approval -> production.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"   # weekly retrain
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency: ml-pipeline
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  VERSION: ${{ github.run_number }}-${{ github.sha }}
+
+jobs:
+  train:
+    # Skip until the AWS side is configured (repository variables set).
+    if: vars.REGISTRY_BUCKET != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Validate data and train
+        run: PYTHONPATH=src python -m mlpipe.train --out artifacts
+      - name: Model card in the run summary
+        run: cat artifacts/model_card.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: model
+          path: artifacts/
+
+  register:
+    needs: train
+    runs-on: ubuntu-latest
+    environment: staging
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: model
+          path: artifacts/
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt boto3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Upload candidate and compare with champion (fails if worse)
+        run: PYTHONPATH=src python -m mlpipe.registry --bucket "${{ vars.REGISTRY_BUCKET }}" --version "$VERSION"
+      - uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push image
+        id: image
+        run: |
+          IMAGE="${{ vars.ECR_REPOSITORY_URL }}:${VERSION}"
+          docker build -f docker/Dockerfile --build-arg MODEL_VERSION="$VERSION" -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+  deploy-staging:
+    needs: register
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy
+        run: ./.github/scripts/apprunner-deploy.sh "${{ vars.SERVICE_ARN }}" "${{ needs.register.outputs.image }}" "${{ vars.APPRUNNER_ECR_ROLE_ARN }}"
+      - run: pip install httpx
+      - run: python scripts/smoke_test.py --url "${{ vars.SERVICE_URL }}" --version "$VERSION"
+
+  deploy-production:
+    needs: [register, deploy-staging]
+    runs-on: ubuntu-latest
+    environment: production   # protected: requires a reviewer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy
+        run: ./.github/scripts/apprunner-deploy.sh "${{ vars.SERVICE_ARN }}" "${{ needs.register.outputs.image }}" "${{ vars.APPRUNNER_ECR_ROLE_ARN }}"
+      - run: pip install httpx boto3 -r requirements.txt
+      - run: python scripts/smoke_test.py --url "${{ vars.SERVICE_URL }}" --version "$VERSION"
+      - uses: actions/download-artifact@v4
+        with:
+          name: model
+          path: artifacts/
+      - name: Mark as champion
+        run: PYTHONPATH=src python -m mlpipe.registry --bucket "${{ vars.REGISTRY_BUCKET }}" --version "$VERSION" --promote

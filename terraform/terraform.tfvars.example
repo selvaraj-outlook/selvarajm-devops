@@ -1,0 +1,2 @@
+region            = "us-east-1"
+github_repository = "your-github-org/ml-cicd-github-actions"
