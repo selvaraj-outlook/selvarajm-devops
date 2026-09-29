@@ -1,0 +1,131 @@
+# Azure DevOps: validate -> infrastructure -> train & register -> blue/green deploy.
+# Needs an Azure Resource Manager service connection (workload identity federation)
+# named in the variable group below, and environments "mlops-dev" and "mlops-prod"
+# (add an approval check on mlops-prod).
+
+trigger:
+  branches:
+    include: [main]
+
+pr:
+  branches:
+    include: [main]
+
+variables:
+  - group: azureml-mlops          # AZURE_SERVICE_CONNECTION, TF_STATE_* values
+  - name: resourceGroup
+    value: rg-mlops-dev
+  - name: workspace
+    value: mlw-mlops-dev
+  - name: endpoint
+    value: breast-cancer-ep
+  - name: pythonVersion
+    value: "3.11"
+
+stages:
+  - stage: Validate
+    jobs:
+      - job: test
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: $(pythonVersion)
+          - script: pip install -r requirements-dev.txt
+            displayName: Install
+          - script: ruff check . && pytest -q --junitxml=test-results.xml
+            displayName: Lint and test
+          - task: PublishTestResults@2
+            condition: always()
+            inputs:
+              testResultsFiles: test-results.xml
+          - script: |
+              terraform -chdir=terraform fmt -check -recursive
+              terraform -chdir=terraform init -backend=false -input=false
+              terraform -chdir=terraform validate
+            displayName: Terraform validate
+
+  - stage: Infrastructure
+    dependsOn: Validate
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: apply
+        environment: mlops-dev
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: AzureCLI@2
+                  displayName: Terraform apply
+                  inputs:
+                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    addSpnToEnvironment: true
+                    inlineScript: |
+                      set -euo pipefail
+                      export ARM_CLIENT_ID=$servicePrincipalId ARM_TENANT_ID=$tenantId
+                      export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+                      export ARM_OIDC_TOKEN=$idToken ARM_USE_OIDC=true
+                      terraform -chdir=terraform init -input=false \
+                        -backend-config="resource_group_name=$(TF_STATE_RG)" \
+                        -backend-config="storage_account_name=$(TF_STATE_ACCOUNT)" \
+                        -backend-config="container_name=tfstate" \
+                        -backend-config="key=azureml-mlops/dev.tfstate" \
+                        -backend-config="use_oidc=true" -backend-config="use_azuread_auth=true"
+                      terraform -chdir=terraform apply -input=false -auto-approve
+
+  - stage: Train
+    dependsOn: Infrastructure
+    jobs:
+      - job: pipeline
+        timeoutInMinutes: 90
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: $(pythonVersion)
+          - script: pip install scikit-learn pandas && python scripts/make_data.py
+            displayName: Prepare raw data
+          - task: AzureCLI@2
+            displayName: Run Azure ML pipeline (prep -> train -> gate -> register)
+            inputs:
+              azureSubscription: $(AZURE_SERVICE_CONNECTION)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                az extension add -n ml --upgrade -y
+                az configure --defaults group=$(resourceGroup) workspace=$(workspace)
+                az ml environment create --file aml/environment/environment.yaml || true
+                RUN=$(az ml job create --file aml/pipeline.yaml --query name -o tsv)
+                echo "Azure ML job: $RUN"
+                az ml job stream --name "$RUN"
+                STATUS=$(az ml job show --name "$RUN" --query status -o tsv)
+                [ "$STATUS" = "Completed" ] || { echo "job ended with $STATUS"; exit 1; }
+
+  - stage: Deploy
+    dependsOn: Train
+    jobs:
+      - deployment: blue_green
+        environment: mlops-prod          # approval gate
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: AzureCLI@2
+                  displayName: Blue/green rollout
+                  inputs:
+                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    scriptType: bash
+                    scriptLocation: scriptPath
+                    scriptPath: scripts/blue_green.sh
+                    arguments: $(resourceGroup) $(workspace) $(endpoint)

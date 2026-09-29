@@ -1,0 +1,5 @@
+resource_group_name  = "rg-tfstate"
+storage_account_name = "sttfstate12345"
+container_name       = "tfstate"
+key                  = "azureml-mlops/dev.tfstate"
+use_azuread_auth     = true

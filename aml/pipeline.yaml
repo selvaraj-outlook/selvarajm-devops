@@ -1,0 +1,39 @@
+$schema: https://azuremlschemas.azureedge.net/latest/pipelineJob.schema.json
+type: pipeline
+display_name: breast-cancer-training
+experiment_name: breast-cancer-training
+description: Prepare data, train, gate on ROC-AUC and register the model.
+
+settings:
+  default_compute: azureml:cpu-cluster
+  continue_on_step_failure: false
+
+inputs:
+  raw_data:
+    type: uri_folder
+    path: ../data
+  min_auc: 0.95
+
+jobs:
+  prep:
+    type: command
+    component: ./components/prep.yaml
+    inputs:
+      raw_data: ${{parent.inputs.raw_data}}
+
+  train:
+    type: command
+    component: ./components/train.yaml
+    inputs:
+      train_data: ${{parent.jobs.prep.outputs.train_data}}
+      test_data: ${{parent.jobs.prep.outputs.test_data}}
+      n_estimators: 300
+      max_depth: 12
+
+  register:
+    type: command
+    component: ./components/register.yaml
+    inputs:
+      model_path: ${{parent.jobs.train.outputs.model_output}}
+      metrics: ${{parent.jobs.train.outputs.metrics_output}}
+      min_auc: ${{parent.inputs.min_auc}}

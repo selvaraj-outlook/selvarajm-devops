@@ -1,0 +1,3 @@
+location    = "centralindia"
+name        = "mlops"
+environment = "dev"

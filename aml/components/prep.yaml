@@ -1,0 +1,24 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+type: command
+name: prep_data
+display_name: Prepare data
+version: "1"
+inputs:
+  raw_data:
+    type: uri_folder
+  test_size:
+    type: number
+    default: 0.2
+outputs:
+  train_data:
+    type: uri_folder
+  test_data:
+    type: uri_folder
+code: ../../src/prep
+environment: azureml:sklearn-train:1
+command: >-
+  python prep.py
+  --raw_data ${{inputs.raw_data}}
+  --test_size ${{inputs.test_size}}
+  --train_data ${{outputs.train_data}}
+  --test_data ${{outputs.test_data}}

@@ -1,0 +1,24 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+type: command
+name: register_model
+display_name: Quality gate and register
+version: "1"
+inputs:
+  model_path:
+    type: mlflow_model
+  metrics:
+    type: uri_folder
+  model_name:
+    type: string
+    default: breast-cancer-rf
+  min_auc:
+    type: number
+    default: 0.95
+code: ../../src/register
+environment: azureml:sklearn-train:1
+command: >-
+  python register.py
+  --model_path ${{inputs.model_path}}
+  --metrics ${{inputs.metrics}}
+  --model_name ${{inputs.model_name}}
+  --min_auc ${{inputs.min_auc}}

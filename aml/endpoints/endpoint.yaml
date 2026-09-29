@@ -1,0 +1,4 @@
+$schema: https://azuremlschemas.azureedge.net/latest/managedOnlineEndpoint.schema.json
+name: breast-cancer-ep
+auth_mode: aad_token
+description: Real-time scoring for the breast-cancer model
