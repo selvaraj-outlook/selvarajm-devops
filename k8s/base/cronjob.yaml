@@ -1,0 +1,47 @@
+# Compare the last day of inference traffic with the training reference.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: model-drift
+  namespace: monitoring
+spec:
+  schedule: "15 1 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1800
+      template:
+        spec:
+          serviceAccountName: model-drift
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: drift
+              image: model-drift-job
+              env:
+                - name: DATA_BUCKET
+                  value: drift-data-123456789012-us-east-1
+                - name: REFERENCE_KEY
+                  value: reference/train.parquet
+                - name: MODEL_NAME
+                  value: fraud-detector
+                - name: PUSHGATEWAY_URL
+                  value: http://prometheus-pushgateway.monitoring.svc:9091
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 512Mi
+                limits:
+                  memory: 2Gi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]

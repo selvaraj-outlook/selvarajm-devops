@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - serviceaccount.yaml
+  - cronjob.yaml
+  - prometheusrule.yaml
+configMapGenerator:
+  - name: model-drift-dashboard
+    namespace: monitoring
+    files:
+      - model-drift-dashboard.json
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"

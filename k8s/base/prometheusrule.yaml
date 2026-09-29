@@ -1,0 +1,32 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: model-drift
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: model-drift
+      rules:
+        - alert: ModelDatasetDrift
+          expr: max by (model) (model_drift_share) >= 0.3
+          labels:
+            severity: warning
+          annotations:
+            summary: "Dataset drift on {{ $labels.model }}"
+            description: "{{ $value | humanizePercentage }} of features drifted against the training reference. Review the Grafana dashboard and consider retraining."
+        - alert: ModelFeatureDriftHighPSI
+          expr: max by (model, feature) (model_feature_psi) >= 0.25
+          labels:
+            severity: info
+          annotations:
+            summary: "Feature {{ $labels.feature }} drifted on {{ $labels.model }}"
+            description: "PSI is {{ $value | printf \"%.2f\" }} (0.25 or more is a significant shift)."
+        - alert: ModelDriftJobStale
+          expr: time() - max by (model) (model_drift_last_run_timestamp_seconds) > 26 * 3600
+          labels:
+            severity: warning
+          annotations:
+            summary: "Drift job for {{ $labels.model }} has not succeeded in over 26h"
+            description: "Check the model-drift CronJob in the monitoring namespace."

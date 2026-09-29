@@ -1,0 +1,78 @@
+{
+  "title": "Model drift",
+  "uid": "model-drift",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": { "from": "now-30d", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "model",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(model_drift_share, model)",
+        "refresh": 2
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Drifted features (share)",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "model_drift_share{model=\"$model\"}" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 0.1 },
+            { "color": "red", "value": 0.3 }
+          ] }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Rows in last window",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "model_drift_current_rows{model=\"$model\"}" }]
+    },
+    {
+      "type": "stat",
+      "title": "Last run",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "model_drift_last_run_timestamp_seconds{model=\"$model\"} * 1000" }],
+      "fieldConfig": { "defaults": { "unit": "dateTimeFromNow" } }
+    },
+    {
+      "type": "bargauge",
+      "title": "PSI by feature",
+      "gridPos": { "x": 0, "y": 5, "w": 12, "h": 10 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sort_desc(model_feature_psi{model=\"$model\"})", "legendFormat": "{{feature}}" }],
+      "options": { "orientation": "horizontal", "displayMode": "gradient" },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 0.1 },
+            { "color": "red", "value": 0.25 }
+          ] }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Drift share over time",
+      "gridPos": { "x": 12, "y": 5, "w": 12, "h": 10 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "model_drift_share{model=\"$model\"}", "legendFormat": "drift share" }],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } }
+    }
+  ]
+}
