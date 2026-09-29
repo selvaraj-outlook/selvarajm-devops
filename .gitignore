@@ -1,0 +1,58 @@
+# Terraform
+# Provider plugin cache. Contains vendored provider binaries in the hundreds of
+# megabytes, well past GitHub's 100 MB per-file limit. Always regenerable with
+# `terraform init`.
+.terraform/
+
+# State. May contain secrets in plaintext (the EKS cluster certificate, KMS key
+# material references, any sensitive variable values). Belongs in the S3 backend
+# declared in terraform/versions.tf, never in git.
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform.tfstate.lock.info
+
+# Plan output is a binary snapshot that also embeds resolved sensitive values.
+*.tfplan
+crash.log
+crash.*.log
+
+# Machine-specific variable values.
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+# *.auto.tfvars is the shared, committed configuration that CI and local runs
+# both load. Keep secrets out of those files.
+!*.auto.tfvars
+
+# Backend config holds an environment-specific bucket name.
+# backend.hcl.example is the tracked template.
+backend.hcl
+
+# Local CLI overrides
+.terraformrc
+terraform.rc
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# The dependency lock file is intentionally NOT ignored. It pins provider
+# versions and belongs in version control.
+
+# Kubernetes
+kubeconfig
+kubeconfig.yaml
+*.kubeconfig
+
+# Secrets that must never be committed, per docs/gpu-prerequisites.md
+.env
+*.pem
+*.key
+hf-token*
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
