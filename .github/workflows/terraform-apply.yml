@@ -1,0 +1,161 @@
+##############################################################################
+# terraform-apply.yml
+#
+# Manual apply only — triggered from GitHub Actions UI (workflow_dispatch).
+# Only runs from the main branch. Requires typing APPLY to confirm.
+# Pauses at the "production" environment for human approval before applying.
+#
+# Authentication: OIDC role only (same as terraform-plan.yml) — no static
+# AWS keys anywhere in this pipeline. Requires the GH_ACTIONS_ROLE_ARN secret.
+##############################################################################
+name: "Terraform Apply"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type APPLY to confirm you have reviewed the plan"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TF_VERSION: "1.15.4"
+  AWS_REGION:  "us-east-1"
+  WORKING_DIR: "."
+
+jobs:
+  # --------------------------------------------------------------------------
+  # Gate — branch + confirmation check
+  # --------------------------------------------------------------------------
+  gate:
+    name: "gate"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Must be main branch
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "❌ Apply is only allowed from main. Current ref: ${{ github.ref }}"
+          exit 1
+
+      - name: Must type APPLY
+        if: github.event.inputs.confirm != 'APPLY'
+        run: |
+          echo "❌ Type APPLY in the confirmation field. Got: '${{ github.event.inputs.confirm }}'"
+          exit 1
+
+      - run: echo "✅ Gate passed"
+
+  # --------------------------------------------------------------------------
+  # Plan (fresh — never apply a cached plan)
+  # --------------------------------------------------------------------------
+  plan:
+    name: "plan (pre-apply)"
+    runs-on: ubuntu-latest
+    needs: gate
+    environment: production   # waits for reviewer approval here
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+    outputs:
+      exitcode: ${{ steps.plan.outputs.exitcode }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: true
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.GH_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-apply
+
+      - name: Terraform init
+        run: terraform init -no-color
+
+      - name: Terraform plan
+        id: plan
+        run: |
+          terraform plan \
+            -no-color \
+            -detailed-exitcode \
+            -var="aws_profile=" \
+            -out=tfplan.binary 2>&1 | tee plan-output.txt
+          echo "exitcode=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Plan summary
+        run: |
+          echo "### Plan Output" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -30 plan-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-apply
+          path: |
+            tfplan.binary
+            plan-output.txt
+          retention-days: 1
+
+      - name: Fail on plan error
+        if: steps.plan.outputs.exitcode == '1'
+        run: echo "❌ Plan errored — aborting" && exit 1
+
+      - name: No changes
+        if: steps.plan.outputs.exitcode == '0'
+        run: echo "✅ No changes detected"
+
+  # --------------------------------------------------------------------------
+  # Apply
+  # --------------------------------------------------------------------------
+  apply:
+    name: "apply"
+    runs-on: ubuntu-latest
+    needs: plan
+    environment: production
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.GH_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-apply
+
+      - name: Terraform init
+        run: terraform init -no-color
+
+      - name: Download plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-apply
+          path: ${{ env.WORKING_DIR }}
+
+      - name: Terraform apply
+        run: terraform apply -no-color -auto-approve tfplan.binary
+
+      - name: Apply summary
+        if: always()
+        run: |
+          echo "### Apply Result" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
