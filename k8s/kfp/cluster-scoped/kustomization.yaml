@@ -1,0 +1,5 @@
+# Step 1: CRDs and cluster-scoped resources for Kubeflow Pipelines standalone.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - https://github.com/kubeflow/pipelines/manifests/kustomize/cluster-scoped-resources?ref=2.3.0

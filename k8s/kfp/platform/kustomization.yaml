@@ -1,0 +1,15 @@
+# Step 2: Kubeflow Pipelines standalone, with the pipeline-runner service
+# account bound to an IAM role (IRSA) so components can write models to S3.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - https://github.com/kubeflow/pipelines/manifests/kustomize/env/platform-agnostic?ref=2.3.0
+patches:
+  - target:
+      kind: ServiceAccount
+      name: pipeline-runner
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/kfp-pipeline-runner
