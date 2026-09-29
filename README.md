@@ -18,18 +18,38 @@ AWS · Azure · Kubernetes · Terraform · CI/CD · Cloud Governance
 
 Each project lives on its own branch of this repo.
 
+### ☁️ Platform & Kubernetes
+
 | Project | What it shows | Branch |
 |---|---|---|
 | **GPU LLM inference on EKS** | vLLM on Amazon EKS with GPU node groups, Terraform (VPC, EKS, ECR, IRSA), Kustomize overlays for dev/staging/prod, and a GitHub Actions pipeline using OIDC | [`k8s-vllm`](https://github.com/selvaraj-outlook/selvarajm-devops/tree/k8s-vllm) |
 | **AWS Service Catalog platform** | Self-service provisioning across an AWS Organization: 32 secure-by-default products, launch constraints, org-wide sharing, StackSets, cross-account DNS Lambda, OIDC plan/apply pipelines | [`aws-service-catalog`](https://github.com/selvaraj-outlook/selvarajm-devops/tree/aws-service-catalog) |
 
+### 🤖 MLOps
+
+| Project | What it shows | Branch |
+|---|---|---|
+| **MLflow on EKS** | Tracking server and model registry: RDS PostgreSQL (Secrets Manager password), S3 artifacts, IRSA, internal ALB | [`mlflow-on-eks`](https://github.com/selvaraj-outlook/selvarajm-devops/tree/mlflow-on-eks) |
+| **KServe model serving** | Serverless inference with Knative and Kourier, immutable S3 model versions, canary rollout with promote/rollback, gated release pipeline | [`kserve-model-serving`](https://github.com/selvaraj-outlook/selvarajm-devops/tree/kserve-model-serving) |
+| **SageMaker Pipelines** | Preprocess → train → evaluate → accuracy gate → Model Registry; EventBridge + Lambda deploy on approval (blue/green) | [`sagemaker-pipelines`](https://github.com/selvaraj-outlook/selvarajm-devops/tree/sagemaker-pipelines) |
+| **Kubeflow training pipeline** | KFP v2 components with typed artifacts, accuracy gate, publish to S3 via IRSA; KFP 2.3 standalone install | [`kubeflow-training-pipeline`](https://github.com/selvaraj-outlook/selvarajm-devops/tree/kubeflow-training-pipeline) |
+| **Feast feature store** | S3 offline store and registry, DynamoDB online store, point-in-time training data, hourly materialization CronJob | [`feast-feature-store`](https://github.com/selvaraj-outlook/selvarajm-devops/tree/feast-feature-store) |
+| **Model drift monitoring** | PSI, KS and chi-square drift job → Pushgateway → Prometheus alerts and Grafana dashboard as code | [`model-drift-monitoring`](https://github.com/selvaraj-outlook/selvarajm-devops/tree/model-drift-monitoring) |
+| **Bedrock RAG platform** | Knowledge Bases + OpenSearch Serverless, guardrails (prompt attack, PII), IAM-auth API, auto re-ingestion, evaluation gate | [`bedrock-rag-platform`](https://github.com/selvaraj-outlook/selvarajm-devops/tree/bedrock-rag-platform) |
+| **Karpenter GPU autoscaling** | Spot-first GPU NodePools on Bottlerocket, interruption handling, vLLM with KEDA scale-to-zero, cost report | [`karpenter-gpu-autoscaling`](https://github.com/selvaraj-outlook/selvarajm-devops/tree/karpenter-gpu-autoscaling) |
+| **ML CI/CD with GitHub Actions** | Data validation, champion/challenger gate, model card, App Runner staging → approval → production, OIDC per environment | [`ml-cicd-github-actions`](https://github.com/selvaraj-outlook/selvarajm-devops/tree/ml-cicd-github-actions) |
+| **Azure ML MLOps** | Terraform workspace and scale-to-zero cluster, AML pipeline with gate, blue/green managed endpoint, Azure DevOps with OIDC | [`azureml-mlops`](https://github.com/selvaraj-outlook/selvarajm-devops/tree/azureml-mlops) |
+
+Every project has Terraform, CI (validation and tests on each push), a README with an architecture diagram, and deploy and clean-up steps.
+
 ## 🛠️ Tech stack
 
 - **Cloud:** AWS · Azure
 - **IaC:** Terraform · CloudFormation · Bicep
-- **Containers:** Kubernetes (EKS, AKS) · Docker · Kustomize · ArgoCD
+- **Containers:** Kubernetes (EKS, AKS) · Docker · Kustomize · ArgoCD · Karpenter · KEDA
 - **CI/CD:** Azure DevOps · GitLab CI · GitHub Actions · AWS CodePipeline
 - **Governance:** Control Tower · Organizations · SCPs · IAM Identity Center · Service Catalog
+- **MLOps:** MLflow · SageMaker · Kubeflow · KServe · Feast · Bedrock · Azure ML · vLLM
 - **Observability:** CloudWatch · Grafana · Prometheus · Datadog
 - **Scripting:** Python · Bash
 
