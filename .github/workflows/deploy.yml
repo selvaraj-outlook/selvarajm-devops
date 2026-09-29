@@ -1,0 +1,62 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to build and deploy (immutable, e.g. 2.17.2-1)"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency: deploy-mlflow
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+
+      - name: Terraform apply
+        working-directory: terraform
+        env:
+          TF_VAR_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+          TF_VAR_vpc_id: ${{ vars.VPC_ID }}
+          TF_VAR_private_subnet_ids: ${{ vars.PRIVATE_SUBNET_IDS }}
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=mlflow-on-eks/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="use_lockfile=true"
+          terraform apply -input=false -auto-approve
+
+      - name: Build and push image
+        run: |
+          REPO=$(terraform -chdir=terraform output -raw ecr_repository_url)
+          aws ecr get-login-password | docker login --username AWS --password-stdin "${REPO%%/*}"
+          docker build -t "$REPO:${{ inputs.image_tag }}" docker/
+          docker push "$REPO:${{ inputs.image_tag }}"
+
+      - name: Deploy to EKS
+        run: |
+          aws eks update-kubeconfig --name "${{ vars.EKS_CLUSTER_NAME }}"
+          scripts/render-overlay.sh "${{ inputs.image_tag }}"
+          kubectl apply -k k8s/overlays/dev
+          kubectl -n mlflow rollout status deployment/mlflow --timeout=5m

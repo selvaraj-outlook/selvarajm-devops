@@ -1,0 +1,39 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+
+# Values come from `terraform output`; scripts/render-overlay.sh fills them in.
+images:
+  - name: mlflow-server
+    newName: 123456789012.dkr.ecr.us-east-1.amazonaws.com/mlflow/server
+    newTag: "2.17.2-1"
+
+patches:
+  - target:
+      kind: ServiceAccount
+      name: mlflow
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/eks.amazonaws.com~1role-arn
+        value: arn:aws:iam::123456789012:role/mlflow-server
+  - target:
+      kind: ConfigMap
+      name: mlflow-config
+    patch: |-
+      - op: replace
+        path: /data/DB_HOST
+        value: mlflow.abcdefghijkl.us-east-1.rds.amazonaws.com
+      - op: replace
+        path: /data/DB_SECRET_ARN
+        value: arn:aws:secretsmanager:us-east-1:123456789012:secret:rds!db-00000000-0000-0000-0000-000000000000
+      - op: replace
+        path: /data/ARTIFACT_BUCKET
+        value: mlflow-artifacts-123456789012-us-east-1
+  - target:
+      kind: Deployment
+      name: mlflow
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
