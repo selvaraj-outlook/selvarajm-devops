@@ -1,0 +1,13 @@
+# All traffic on the current stable version.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  - target:
+      kind: InferenceService
+      name: wine-classifier
+    patch: |-
+      - op: replace
+        path: /spec/predictor/model/storageUri
+        value: s3://kserve-models-123456789012-us-east-1/wine-classifier/v1

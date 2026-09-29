@@ -1,0 +1,56 @@
+name: release-model
+
+# Publish a new model version and roll it out as a canary.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "New model version, e.g. v2"
+        required: true
+      canary_percent:
+        description: "Share of traffic for the new version"
+        required: true
+        default: "10"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency: release-wine-classifier
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: models
+    env:
+      BUCKET: ${{ vars.MODEL_BUCKET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements-dev.txt
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Train, gate on accuracy, publish to S3
+        run: python src/publish_model.py --bucket "$BUCKET" --version "${{ inputs.version }}"
+
+      - name: Roll out canary
+        run: |
+          aws eks update-kubeconfig --name "${{ vars.EKS_CLUSTER_NAME }}"
+          kubectl -n models patch inferenceservice wine-classifier --type merge -p "$(cat <<JSON
+          {"spec":{"predictor":{"canaryTrafficPercent":${{ inputs.canary_percent }},
+            "model":{"storageUri":"s3://${BUCKET}/wine-classifier/${{ inputs.version }}"}}}}
+          JSON
+          )"
+          kubectl -n models wait --for=condition=Ready inferenceservice/wine-classifier --timeout=10m
+
+      - name: Smoke test
+        run: |
+          LB=$(kubectl -n knative-serving get svc kourier -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          HOST=$(kubectl -n models get inferenceservice wine-classifier -o jsonpath='{.status.url}' | sed 's#^https\?://##')
+          python src/smoke_test.py --url "http://${LB}" --host "$HOST"

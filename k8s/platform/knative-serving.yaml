@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: knative-serving
+---
+apiVersion: operator.knative.dev/v1beta1
+kind: KnativeServing
+metadata:
+  name: knative-serving
+  namespace: knative-serving
+spec:
+  ingress:
+    kourier:
+      enabled: true
+      service-type: LoadBalancer
+  config:
+    network:
+      ingress-class: kourier.ingress.networking.knative.dev
+    domain:
+      # Replace with a real domain for DNS-based routing; the smoke test uses the Host header.
+      example.com: ""
+    autoscaler:
+      scale-to-zero-grace-period: "60s"
+  services:
+    - name: kourier
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: external
+        service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+        service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip

@@ -1,0 +1,17 @@
+# Roll out v2 to 10% of traffic. KServe keeps the previous revision serving
+# the other 90% until the canary is promoted (scripts/promote.sh).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  - target:
+      kind: InferenceService
+      name: wine-classifier
+    patch: |-
+      - op: replace
+        path: /spec/predictor/model/storageUri
+        value: s3://kserve-models-123456789012-us-east-1/wine-classifier/v2
+      - op: add
+        path: /spec/predictor/canaryTrafficPercent
+        value: 10
