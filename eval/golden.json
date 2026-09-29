@@ -1,0 +1,6 @@
+[
+  {"question": "How many days of annual leave do full-time employees get?", "expected": ["25"]},
+  {"question": "Which regions are approved for production workloads?", "expected": ["us-east-1", "eu-west-1"]},
+  {"question": "What is the on-call escalation time for a SEV1 incident?", "expected": ["15 minutes"]},
+  {"question": "Who approves production database schema changes?", "expected": ["data platform"]}
+]

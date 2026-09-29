@@ -1,0 +1,37 @@
+name: rag-eval
+
+# Sync documents to S3 and run the golden-set evaluation against the live
+# knowledge base. Fails if answer quality drops below the gate.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 4 * * 1"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  evaluate:
+    if: vars.KNOWLEDGE_BASE_ID != ''
+    runs-on: ubuntu-latest
+    environment: rag
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements-dev.txt
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      - name: Sync documents (S3 event starts ingestion)
+        run: aws s3 sync docs/sample "s3://${{ vars.DOCS_BUCKET }}/" --delete
+      - name: Wait for ingestion
+        run: sleep 120
+      - name: Evaluate
+        run: |
+          python eval/run_eval.py --kb-id "${{ vars.KNOWLEDGE_BASE_ID }}" \
+            --model-arn "arn:aws:bedrock:${AWS_REGION}::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0" \
+            --min-score 0.75
