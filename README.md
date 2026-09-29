@@ -1,6 +1,6 @@
 # Hi, I'm Selvaraj M 👋
 
-**Senior Cloud Engineer at Presidio** · Chennai, India
+**Senior Cloud Engineer at Presidio** · Chennai, India<br>
 AWS · Azure · Kubernetes · Terraform · CI/CD · Cloud Governance
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Selvaraj%20M-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/selvarajm-50939520a)
@@ -25,13 +25,13 @@ Each project lives on its own branch of this repo.
 
 ## 🛠️ Tech stack
 
-**Cloud:** AWS · Azure
-**IaC:** Terraform · CloudFormation · Bicep
-**Containers:** Kubernetes (EKS, AKS) · Docker · Kustomize · ArgoCD
-**CI/CD:** Azure DevOps · GitLab CI · GitHub Actions · AWS CodePipeline
-**Governance:** Control Tower · Organizations · SCPs · IAM Identity Center · Service Catalog
-**Observability:** CloudWatch · Grafana · Prometheus · Datadog
-**Scripting:** Python · Bash
+- **Cloud:** AWS · Azure
+- **IaC:** Terraform · CloudFormation · Bicep
+- **Containers:** Kubernetes (EKS, AKS) · Docker · Kustomize · ArgoCD
+- **CI/CD:** Azure DevOps · GitLab CI · GitHub Actions · AWS CodePipeline
+- **Governance:** Control Tower · Organizations · SCPs · IAM Identity Center · Service Catalog
+- **Observability:** CloudWatch · Grafana · Prometheus · Datadog
+- **Scripting:** Python · Bash
 
 ## 🎓 Certifications
 - AWS Certified Solutions Architect – Associate
