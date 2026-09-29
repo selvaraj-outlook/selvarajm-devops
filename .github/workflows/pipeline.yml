@@ -1,0 +1,44 @@
+name: pipeline
+
+# Deploy the pipeline definition on main, and optionally start a training run.
+on:
+  push:
+    branches: [main]
+    paths: ["pipeline/**"]
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "Start a pipeline execution after deploying"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency: sagemaker-pipeline
+
+jobs:
+  deploy:
+    # Skip until the repository variables are configured.
+    if: vars.PIPELINE_NAME != ''
+    runs-on: ubuntu-latest
+    environment: ml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install boto3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      - name: Upsert pipeline
+        run: |
+          python -m pipeline.deploy_pipeline \
+            --name "${{ vars.PIPELINE_NAME }}" \
+            --bucket "${{ vars.ML_BUCKET }}" \
+            --role-arn "${{ vars.SAGEMAKER_ROLE_ARN }}" \
+            --model-package-group "${{ vars.MODEL_PACKAGE_GROUP }}" \
+            ${{ inputs.start && '--start' || '' }}
