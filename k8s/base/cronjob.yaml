@@ -1,0 +1,54 @@
+# Push the latest feature values from the offline store into DynamoDB every hour.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: feast-materialize
+  namespace: feast
+spec:
+  schedule: "5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        spec:
+          serviceAccountName: feast-materialize
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: materialize
+              image: feast-materialize
+              command: ["/bin/sh", "-c"]
+              args: ['feast materialize-incremental "$(date -u +%Y-%m-%dT%H:%M:%S)"']
+              env:
+                - name: FEAST_BUCKET
+                  value: feast-123456789012-us-east-1
+                - name: FEAST_DATA_ROOT
+                  value: s3://feast-123456789012-us-east-1/data
+                - name: AWS_REGION
+                  value: us-east-1
+                - name: HOME
+                  value: /tmp
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 512Mi
+                limits:
+                  memory: 1Gi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}

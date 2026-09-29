@@ -1,0 +1,13 @@
+# Production configuration: S3 offline data + registry, DynamoDB online store.
+# Values are filled from environment variables so the same file works in CI,
+# on a laptop and in the materialization CronJob.
+project: driver_stats
+provider: aws
+registry: s3://${FEAST_BUCKET}/registry/registry.db
+online_store:
+  type: dynamodb
+  region: ${AWS_REGION}
+  table_name_template: "{project}.{table_name}"
+offline_store:
+  type: file
+entity_key_serialization_version: 2

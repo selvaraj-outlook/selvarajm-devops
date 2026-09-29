@@ -1,0 +1,41 @@
+name: feast-apply
+
+# Register feature definitions in the S3 registry and create/update the
+# DynamoDB online tables. Runs on main when definitions change.
+on:
+  push:
+    branches: [main]
+    paths: ["feature_repo/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency: feast-apply
+
+jobs:
+  apply:
+    if: vars.FEAST_BUCKET != ''
+    runs-on: ubuntu-latest
+    environment: features
+    env:
+      FEAST_BUCKET: ${{ vars.FEAST_BUCKET }}
+      FEAST_DATA_ROOT: s3://${{ vars.FEAST_BUCKET }}/data
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install "feast[aws]==0.42.0"
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Plan
+        working-directory: feature_repo
+        run: feast plan
+      - name: Apply
+        working-directory: feature_repo
+        run: feast apply
