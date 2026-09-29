@@ -1,0 +1,31 @@
+# Scale on in-flight requests (vLLM Prometheus metric), keep at least one
+# replica during business hours, and scale to zero at night. Karpenter then
+# removes the empty GPU nodes, which is where the savings come from.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: llm
+  namespace: inference
+spec:
+  scaleTargetRef:
+    name: llm
+  minReplicaCount: 0
+  maxReplicaCount: 6
+  cooldownPeriod: 600
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+        query: sum(vllm:num_requests_running{namespace="inference"}) + sum(vllm:num_requests_waiting{namespace="inference"})
+        threshold: "8"
+    - type: cron
+      metadata:
+        timezone: Asia/Kolkata
+        start: 0 8 * * 1-5
+        end: 0 21 * * 1-5
+        desiredReplicas: "1"
