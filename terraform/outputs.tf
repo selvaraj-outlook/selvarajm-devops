@@ -7,3 +7,23 @@ output "model_puller_role_arn" {
   description = "IRSA role for the predictor service account."
   value       = aws_iam_role.model_puller.arn
 }
+
+output "cluster_name" {
+  description = "Name of the EKS cluster."
+  value       = module.eks.cluster_name
+}
+
+output "cluster_endpoint" {
+  description = "Kubernetes API endpoint."
+  value       = module.eks.cluster_endpoint
+}
+
+output "vpc_id" {
+  description = "VPC hosting the cluster."
+  value       = module.vpc.vpc_id
+}
+
+output "update_kubeconfig" {
+  description = "Command that configures kubectl for the cluster."
+  value       = "aws eks update-kubeconfig --name ${module.eks.cluster_name} --region ${var.region}"
+}

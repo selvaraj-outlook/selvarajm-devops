@@ -1,7 +1,7 @@
 data "aws_caller_identity" "current" {}
 
 locals {
-  oidc_issuer = replace(data.aws_eks_cluster.this.identity[0].oidc[0].issuer, "https://", "")
+  oidc_issuer = module.eks.oidc_provider
 }
 
 ################################################################################
@@ -46,7 +46,7 @@ data "aws_iam_policy_document" "assume" {
     actions = ["sts:AssumeRoleWithWebIdentity"]
     principals {
       type        = "Federated"
-      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${local.oidc_issuer}"]
+      identifiers = [module.eks.oidc_provider_arn]
     }
     condition {
       test     = "StringEquals"

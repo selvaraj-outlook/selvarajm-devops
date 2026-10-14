@@ -29,7 +29,7 @@ flowchart LR
 
 | Path | What it holds |
 |---|---|
-| `terraform/` | Model bucket, IRSA role, Helm releases (cert-manager, Knative operator, KServe) |
+| `terraform/` | VPC, EKS cluster and node group, model bucket, IRSA role, Helm releases (cert-manager, Knative operator, KServe) |
 | `k8s/platform/` | `KnativeServing` custom resource with Kourier on an internal NLB |
 | `k8s/models/` | InferenceService base, plus `stable` and `canary` overlays |
 | `src/publish_model.py` | Trains, gates on accuracy and publishes an immutable version |
@@ -41,7 +41,8 @@ flowchart LR
 ```bash
 # Platform
 terraform -chdir=terraform init -backend-config=backend.hcl
-terraform -chdir=terraform apply -var cluster_name=my-eks-cluster
+terraform -chdir=terraform apply                   # VPC, EKS, model bucket, IRSA, Helm releases
+$(terraform -chdir=terraform output -raw update_kubeconfig)
 make bootstrap                                     # KnativeServing + Kourier
 
 # First model version
