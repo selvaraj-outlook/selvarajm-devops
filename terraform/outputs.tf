@@ -27,3 +27,8 @@ output "update_kubeconfig" {
   description = "Command that configures kubectl for the cluster."
   value       = "aws eks update-kubeconfig --name ${module.eks.cluster_name} --region ${var.region}"
 }
+
+output "model_publisher_role_arn" {
+  description = "IRSA role for the publish Job."
+  value       = aws_iam_role.model_publisher.arn
+}

@@ -143,3 +143,49 @@ resource "helm_release" "kserve" {
 
   depends_on = [helm_release.cert_manager, helm_release.kserve_crd, helm_release.knative_operator]
 }
+
+################################################################################
+# IRSA: the publish Job gets write access to the model bucket
+################################################################################
+
+data "aws_iam_policy_document" "assume_publisher" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [module.eks.oidc_provider_arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_issuer}:sub"
+      values   = ["system:serviceaccount:${var.model_namespace}:model-publisher"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_issuer}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "model_publisher" {
+  name               = "${var.cluster_name}-model-publisher"
+  assume_role_policy = data.aws_iam_policy_document.assume_publisher.json
+}
+
+data "aws_iam_policy_document" "write_models" {
+  statement {
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.models.arn]
+  }
+  statement {
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.models.arn}/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "write_models" {
+  name   = "write-models"
+  role   = aws_iam_role.model_publisher.id
+  policy = data.aws_iam_policy_document.write_models.json
+}

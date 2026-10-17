@@ -1,0 +1,25 @@
+# Call the deployed model from inside the cluster through Kourier:
+#   kubectl create -f k8s/jobs/smoke-test.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: smoke-test-
+  namespace: models
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: smoke
+          image: 255694842578.dkr.ecr.us-west-2.amazonaws.com/models/code:latest
+          imagePullPolicy: Always
+          args:
+            - src/smoke_test.py
+            - --url=http://kourier-internal.knative-serving.svc.cluster.local
+            - --host=wine-classifier-predictor.models.example.com
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi

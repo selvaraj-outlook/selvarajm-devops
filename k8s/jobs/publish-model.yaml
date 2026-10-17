@@ -1,0 +1,32 @@
+# Train and publish a model version to S3. Create (not apply) so each run gets a new name:
+#   kubectl create -f k8s/jobs/publish-model.yaml
+# Change --version for every run; published versions are immutable.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: publish-model-
+  namespace: models
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: model-publisher
+      containers:
+        - name: publish
+          image: 255694842578.dkr.ecr.us-west-2.amazonaws.com/models/code:latest
+          imagePullPolicy: Always
+          args:
+            - src/publish_model.py
+            - --bucket=code-eks-models-255694842578-us-west-2
+            - --version=v1
+          env:
+            - name: AWS_REGION
+              value: us-west-2
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
