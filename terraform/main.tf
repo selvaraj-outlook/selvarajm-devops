@@ -9,7 +9,7 @@ locals {
 ################################################################################
 
 resource "aws_s3_bucket" "models" {
-  bucket = "${var.name}-models-${data.aws_caller_identity.current.account_id}-${var.region}"
+  bucket = "${var.cluster_name}-models-${data.aws_caller_identity.current.account_id}-${var.region}"
 }
 
 resource "aws_s3_bucket_public_access_block" "models" {
@@ -62,7 +62,7 @@ data "aws_iam_policy_document" "assume" {
 }
 
 resource "aws_iam_role" "model_puller" {
-  name               = "${var.name}-model-puller"
+  name               = "${var.cluster_name}-model-puller"
   assume_role_policy = data.aws_iam_policy_document.assume.json
 }
 

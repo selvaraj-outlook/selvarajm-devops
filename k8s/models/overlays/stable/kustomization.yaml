@@ -10,4 +10,4 @@ patches:
     patch: |-
       - op: replace
         path: /spec/predictor/model/storageUri
-        value: s3://kserve-models-123456789012-us-east-1/wine-classifier/v1
+        value: s3://code-eks-models-255694842578-us-west-2/wine-classifier/v1

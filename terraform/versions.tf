@@ -12,7 +12,13 @@ terraform {
     }
   }
 
-  backend "s3" {}
+  backend "s3" {
+    bucket       = "code-eks-tfstate-255694842578-us-west-2"
+    key          = "code-eks/terraform.tfstate"
+    region       = "us-west-2"
+    use_lockfile = true
+    encrypt      = true
+  }
 }
 
 provider "aws" {

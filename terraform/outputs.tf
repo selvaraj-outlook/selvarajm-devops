@@ -20,7 +20,7 @@ output "cluster_endpoint" {
 
 output "vpc_id" {
   description = "VPC hosting the cluster."
-  value       = module.vpc.vpc_id
+  value       = var.vpc_id
 }
 
 output "update_kubeconfig" {

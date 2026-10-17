@@ -1,43 +1,46 @@
 variable "region" {
   description = "AWS region."
   type        = string
-  default     = "us-east-1"
+  default     = "us-west-2"
 }
 
 variable "cluster_name" {
   description = "Name of the EKS cluster to create."
   type        = string
-  default     = "kserve-eks"
+  default     = "code-eks"
 }
 
 variable "kubernetes_version" {
   description = "EKS Kubernetes version."
   type        = string
-  default     = "1.31"
+  default     = "1.30"
 }
 
-variable "vpc_cidr" {
-  description = "CIDR block for the cluster VPC."
+variable "vpc_id" {
+  description = "Existing VPC to deploy the cluster into."
   type        = string
-  default     = "10.0.0.0/16"
+  default     = "vpc-06348d507b3dec089"
 }
 
-variable "az_count" {
-  description = "Number of availability zones to spread subnets and nodes across."
-  type        = number
-  default     = 3
+variable "subnet_ids" {
+  description = "Private subnets for the cluster and nodes."
+  type        = list(string)
+  default = [
+    "subnet-07178b972c79ead3d", # project-subnet-private1-us-west-2b
+    "subnet-08d446be8309a9b0d", # project-subnet-private2-us-west-2a
+  ]
 }
 
-variable "single_nat_gateway" {
-  description = "Use one NAT gateway for all AZs (cheaper) instead of one per AZ (highly available)."
-  type        = bool
-  default     = true
+variable "nat_public_subnet_id" {
+  description = "Public subnet that hosts the NAT gateway."
+  type        = string
+  default     = "subnet-00b0a1297e4d00bea" # project-subnet-public2-us-west-2a
 }
 
 variable "node_instance_types" {
-  description = "Instance types for the managed node group, in any order. Use several 2 vCPU / 8 GiB types so a capacity shortage on one does not block the deploy."
+  description = "Instance types for the managed node group."
   type        = list(string)
-  default     = ["t3.large", "t3a.large", "m5.large", "m5a.large", "m6i.large"]
+  default     = ["t3.medium"]
 }
 
 variable "node_capacity_type" {
@@ -70,12 +73,6 @@ variable "cluster_endpoint_public_access_cidrs" {
   description = "CIDRs allowed to reach the public Kubernetes API endpoint. Restrict this outside of experiments."
   type        = list(string)
   default     = ["0.0.0.0/0"]
-}
-
-variable "name" {
-  description = "Name prefix for AWS resources."
-  type        = string
-  default     = "kserve"
 }
 
 variable "model_namespace" {

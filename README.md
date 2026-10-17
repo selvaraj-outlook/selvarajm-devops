@@ -40,7 +40,7 @@ flowchart LR
 
 ```bash
 # Platform
-terraform -chdir=terraform init -backend-config=backend.hcl
+terraform -chdir=terraform init
 terraform -chdir=terraform apply                   # VPC, EKS, model bucket, IRSA, Helm releases
 $(terraform -chdir=terraform output -raw update_kubeconfig)
 make bootstrap                                     # KnativeServing + Kourier

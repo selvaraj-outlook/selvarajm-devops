@@ -1,0 +1,13 @@
+.git
+.github
+terraform
+k8s
+tests
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+mlruns
+*.tfstate*
+.env
